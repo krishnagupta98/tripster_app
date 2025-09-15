@@ -1,10 +1,12 @@
 // lib/trip_details_page.dart
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_application_1/models/trip_model.dart';
+
+const Color kPrimaryBlue = Color(0xFF1E40AF);
+const Color kDarkBlue = Color(0xFF1E3A8A);
 
 class TripDetailsPage extends StatelessWidget {
   final Trip trip;
@@ -17,12 +19,10 @@ class TripDetailsPage extends StatelessWidget {
         slivers: [
           SliverAppBar(
             expandedHeight: 300.0,
-            backgroundColor: Colors.white,
-            elevation: 0,
             pinned: true,
             flexibleSpace: FlexibleSpaceBar(
               title: Text(
-                trip.location,
+                trip.name,
                 style: GoogleFonts.playfairDisplay(color: Colors.white, fontWeight: FontWeight.bold),
               ),
               background: Hero(
@@ -43,28 +43,29 @@ class TripDetailsPage extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildDetailItem(
-                      icon: Icons.calendar_today,
-                      title: 'Planned Date',
-                      content: DateFormat('MMMM d, yyyy').format(trip.plannedDate),
+                    _buildDetailItem(    
+                    icon: Icons.date_range_outlined,
+                      title: 'Trip Dates',
+                      content:
+                          '${DateFormat('MMM d, yyyy').format(trip.plannedDate)} - ${DateFormat('MMM d, yyyy').format(trip.endDate)}',
                     ),
                     const SizedBox(height: 24),
                     _buildDetailItem(
-                      icon: Icons.notes,
+                      icon: Icons.notes_outlined,
                       title: 'Notes',
                       content: trip.notes,
                     ),
                     const SizedBox(height: 24),
                     Text(
                       'Planned Activities',
-                      style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold, color: const Color(0xFF1565C0)),
+                      style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold, color: kDarkBlue),
                     ),
                     const SizedBox(height: 8),
                     ...trip.activities.map((activity) => Card(
                           elevation: 1,
                           margin: const EdgeInsets.symmetric(vertical: 4),
                           child: ListTile(
-                            leading: const Icon(Icons.check_circle_outline, color: Color(0xFF2196F3)),
+                            leading: const Icon(Icons.check_circle_outline, color: kPrimaryBlue),
                             title: Text(activity, style: GoogleFonts.poppins()),
                           ),
                         )),
@@ -84,11 +85,11 @@ class TripDetailsPage extends StatelessWidget {
       children: [
         Row(
           children: [
-            Icon(icon, color: const Color(0xFF2196F3), size: 20),
+            Icon(icon, color: kPrimaryBlue, size: 20),
             const SizedBox(width: 8),
             Text(
               title,
-              style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold, color: const Color(0xFF1565C0)),
+              style: GoogleFonts.poppins(fontSize: 20, fontWeight: FontWeight.bold, color: kDarkBlue),
             ),
           ],
         ),

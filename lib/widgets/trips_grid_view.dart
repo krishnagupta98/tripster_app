@@ -1,5 +1,4 @@
 // lib/widgets/trips_grid_view.dart
-
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -8,7 +7,6 @@ import 'package:flutter_application_1/previous_trips_details_page.dart';
 import 'package:flutter_application_1/models/trip_model.dart';
 import 'package:flutter_application_1/models/previous_trip_model.dart';
 
-// This enum tells the grid what kind of data it's displaying
 enum TripType { planned, previous }
 
 class TripsGridView extends StatelessWidget {
@@ -35,9 +33,8 @@ class TripsGridView extends StatelessWidget {
       itemBuilder: (context, index) {
         final dynamic tripData = trips[index];
         
-        // Get the correct image and location based on the trip type
         final String imageUrl = tripType == TripType.planned ? tripData.imageUrl : tripData.baseTrip.imageUrl;
-        final String location = tripType == TripType.planned ? tripData.location : tripData.baseTrip.location;
+        final String name = tripType == TripType.planned ? tripData.name : tripData.baseTrip.name;
 
         return Card(
           clipBehavior: Clip.antiAlias,
@@ -45,7 +42,6 @@ class TripsGridView extends StatelessWidget {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           child: InkWell(
             onTap: () {
-              // Navigate to the correct details page based on the trip type
               if (tripType == TripType.planned) {
                 Navigator.push(context, MaterialPageRoute(builder: (context) => TripDetailsPage(trip: tripData as Trip)));
               } else {
@@ -67,7 +63,6 @@ class TripsGridView extends StatelessWidget {
                 Container(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      // FIXED: Replaced deprecated withOpacity
                       colors: [Colors.black.withAlpha(153), Colors.transparent],
                       begin: Alignment.bottomCenter,
                       end: Alignment.center,
@@ -75,11 +70,12 @@ class TripsGridView extends StatelessWidget {
                   ),
                 ),
                 Positioned(
-                  bottom: 10,
-                  left: 10,
+                  bottom: 16,
+                  left: 16,
+                  right: 16,
                   child: Text(
-                    location,
-                    style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                    name,
+                    style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16, shadows: const [Shadow(blurRadius: 4)]),
                   ),
                 ),
               ],

@@ -1,0 +1,46 @@
+{
+  "project_info": {
+    "project_number": "214949487871",
+    "project_id": "tripster-1dd90",
+    "storage_bucket": "tripster-1dd90.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:214949487871:android:d72f2ac2af6af607d5d8ca",
+        "android_client_info": {
+          "package_name": "com.example.flutter_application_1"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "214949487871-q54gbrt3t8sn4sj62mbmjt5osh66h9gs.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDF4uGHJSHYl14rbCvK-sCeMticllZMbOA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "214949487871-q54gbrt3t8sn4sj62mbmjt5osh66h9gs.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "214949487871-6pm7ncg6hfj3tpdkh42peq9e7molmdrn.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "com.example.flutterApplication1"
+              }
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

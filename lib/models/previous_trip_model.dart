@@ -17,13 +17,18 @@ class TripPhoto {
 
   TripPhoto({required this.imageUrl, required this.date, required this.location});
 }
-
 class PreviousTrip {
   final Trip baseTrip;
+  final List<String> route; // NEW: A list of locations visited
   final List<Expense> expenses;
   final List<TripPhoto> photos;
 
-  PreviousTrip({required this.baseTrip, required this.expenses, required this.photos});
+  PreviousTrip({
+    required this.baseTrip,
+    required this.route,
+    required this.expenses,
+    required this.photos,
+  });
 
   double get totalExpenses => expenses.fold(0, (sum, item) => sum + item.amount);
 }
