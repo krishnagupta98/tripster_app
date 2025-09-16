@@ -9,6 +9,7 @@ import 'package:flutter_application_1/models/trip_model.dart';
 import 'package:flutter_application_1/models/previous_trip_model.dart';
 import 'package:flutter_application_1/widgets/trips_grid_view.dart';
 import 'package:flutter_application_1/widgets/add_trip_form.dart';
+import 'package:flutter_application_1/widgets/explore_map_view.dart';
 
 // Enhanced color palette for professional look
 const Color kPrimaryBlue = Color(0xFF1E40AF);
@@ -150,16 +151,12 @@ class _SigningPageState extends State<SigningPage> {
                 ListTile(
                   leading: const Icon(Icons.person_outline),
                   title: Text("My Account", style: GoogleFonts.poppins()),
-                  onTap: () {
-                    Navigator.pop(context);
-                  },
+                  onTap: () => Navigator.pop(context),
                 ),
                 ListTile(
                   leading: const Icon(Icons.settings_outlined),
                   title: Text("Settings", style: GoogleFonts.poppins()),
-                  onTap: () {
-                    Navigator.pop(context);
-                  },
+                  onTap: () => Navigator.pop(context),
                 ),
                 const Divider(),
                 ListTile(
@@ -206,6 +203,7 @@ class _SigningPageState extends State<SigningPage> {
         ),
         child: BottomNavigationBar(
           items: const <BottomNavigationBarItem>[
+            BottomNavigationBarItem(icon: Icon(Icons.explore_outlined), activeIcon: Icon(Icons.explore), label: 'Explore'),
             BottomNavigationBarItem(icon: Icon(Icons.schedule_outlined), activeIcon: Icon(Icons.schedule), label: 'Planned'),
             BottomNavigationBarItem(icon: Icon(Icons.history_outlined), activeIcon: Icon(Icons.history), label: 'Previous'),
           ],
@@ -229,6 +227,7 @@ class _SigningPageState extends State<SigningPage> {
 
   Widget _buildDashboardContent() {
     final List<Widget> dashboardPages = [
+      const ExploreMapView(),
       TripsGridView(trips: _plannedTrips, tripType: TripType.planned),
       TripsGridView(trips: _previousTrips, tripType: TripType.previous),
     ];
