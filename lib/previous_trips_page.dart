@@ -800,7 +800,7 @@ class _PlannedTripsViewState extends State<PlannedTripsView> with TickerProvider
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => PlannedTripsPage(plannedTrips: widget.plannedTrips),
+        builder: (context) => PlannedTripsPage(),
       ),
     );
   }

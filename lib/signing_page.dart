@@ -10,6 +10,7 @@ import 'package:flutter_application_1/models/previous_trip_model.dart';
 import 'package:flutter_application_1/widgets/trips_grid_view.dart';
 import 'package:flutter_application_1/widgets/add_trip_form.dart';
 import 'package:flutter_application_1/widgets/explore_map_view.dart';
+import 'package:flutter_application_1/services/database_helper.dart';
 
 // Enhanced color palette for professional look
 const Color kPrimaryBlue = Color(0xFF1E40AF);
@@ -32,8 +33,9 @@ class _SigningPageState extends State<SigningPage> {
   int _selectedIndex = 0;
   bool _isSearchFocused = false;
 
+  List<Trip> _plannedTrips = [];
   final List<String> _popularLocations = [
-    'Tokyo, Japan', 'Paris, France', 'Rome, Italy', 'Bali, Indonesia', 
+    'Tokyo, Japan', 'Paris, France', 'Rome, Italy', 'Bali, Indonesia',
     'New York, USA', 'London, UK', 'Dubai, UAE', 'Maldives'
   ];
 
@@ -41,6 +43,21 @@ class _SigningPageState extends State<SigningPage> {
   void initState() {
     super.initState();
     _searchFocusNode.addListener(_onSearchFocusChange);
+    _loadPlannedTrips();
+  }
+
+  Future<void> _loadPlannedTrips() async {
+    try {
+      final dbHelper = DatabaseHelper();
+      final trips = await dbHelper.getAllTrips();
+      if (mounted) {
+        setState(() {
+          _plannedTrips = trips;
+        });
+      }
+    } catch (e) {
+      print('Error loading planned trips: $e');
+    }
   }
 
   void _onSearchFocusChange() {
@@ -57,26 +74,6 @@ class _SigningPageState extends State<SigningPage> {
     });
   }
 
-  final List<Trip> _plannedTrips = [
-    Trip(
-      name: 'Autumn in Japan',
-      location: 'Kyoto, Japan',
-      imageUrl: 'https://images.unsplash.com/photo-1542051841857-5f90071e7989?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80',
-      plannedDate: DateTime(2025, 10, 20),
-      endDate: DateTime(2025, 10, 30),
-      notes: "Visit ancient temples, walk through the Arashiyama Bamboo Grove, and experience a traditional tea ceremony.",
-      activities: ["Kinkaku-ji Temple", "Fushimi Inari Shrine", "Gion District"],
-    ),
-    Trip(
-      name: 'Winter Skiing',
-      location: 'Swiss Alps',
-      imageUrl: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80',
-      plannedDate: DateTime(2026, 1, 15),
-      endDate: DateTime(2026, 1, 22),
-      notes: "A winter wonderland trip. Focus on skiing in Zermatt and enjoying the scenic train rides.",
-      activities: ["Skiing", "Matterhorn Glacier Paradise", "Gornergrat Railway"],
-    ),
-  ];
 
   final List<PreviousTrip> _previousTrips = [
     PreviousTrip(
@@ -99,7 +96,7 @@ class _SigningPageState extends State<SigningPage> {
     ),
   ];
 
-  void _showAddTripSheet() async {
+  Future<void> _showAddTripSheet() async {
     final newTrip = await showModalBottomSheet<Trip>(
       context: context,
       isScrollControlled: true,
@@ -113,9 +110,15 @@ class _SigningPageState extends State<SigningPage> {
     );
 
     if (newTrip != null && mounted) {
-      setState(() {
-        _plannedTrips.add(newTrip);
-      });
+      try {
+        final dbHelper = DatabaseHelper();
+        await dbHelper.insertTrip(newTrip);
+        await _loadPlannedTrips();
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error saving trip: $e')),
+        );
+      }
     }
   }
 

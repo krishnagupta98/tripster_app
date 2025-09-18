@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_application_1/splash_screen.dart';
 import 'firebase_options.dart';
+import 'services/database_helper.dart';
 
 void main() async {
   // This line is essential. It ensures that the connection to the native

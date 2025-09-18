@@ -28,6 +28,17 @@ dependencies:
   latlong2: ^0.9.1
   geocoding: ^3.0.0
 
+  # Location and Background Services
+  geolocator: ^10.1.0
+  workmanager: ^0.9.0+3
+
+  # Timeline UI
+  timeline_tile: ^2.0.0
+
+  # Database
+  sqflite: ^2.3.3
+  path: ^1.8.5
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
