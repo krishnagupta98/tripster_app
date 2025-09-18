@@ -28,10 +28,7 @@ class SigningPage extends StatefulWidget {
 }
 
 class _SigningPageState extends State<SigningPage> {
-  final _searchController = TextEditingController();
-  final _searchFocusNode = FocusNode();
   int _selectedIndex = 0;
-  bool _isSearchFocused = false;
 
   List<Trip> _plannedTrips = [];
   final List<String> _popularLocations = [
@@ -42,7 +39,6 @@ class _SigningPageState extends State<SigningPage> {
   @override
   void initState() {
     super.initState();
-    _searchFocusNode.addListener(_onSearchFocusChange);
     _loadPlannedTrips();
   }
 
@@ -60,13 +56,6 @@ class _SigningPageState extends State<SigningPage> {
     }
   }
 
-  void _onSearchFocusChange() {
-    if (mounted) {
-      setState(() {
-        _isSearchFocused = _searchFocusNode.hasFocus;
-      });
-    }
-  }
 
   void _onItemTapped(int index) {
     setState(() {
@@ -180,9 +169,6 @@ class _SigningPageState extends State<SigningPage> {
 
   @override
   void dispose() {
-    _searchController.dispose();
-    _searchFocusNode.removeListener(_onSearchFocusChange);
-    _searchFocusNode.dispose();
     super.dispose();
   }
 
@@ -239,41 +225,11 @@ class _SigningPageState extends State<SigningPage> {
       child: Column(
         children: [
           const SizedBox(height: 100),
-          Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 15, offset: const Offset(0, 4))],
-            ),
-            child: TextField(
-              controller: _searchController,
-              focusNode: _searchFocusNode,
-              style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w500, color: kDarkBlue),
-              decoration: InputDecoration(
-                hintText: 'Where would you like to go?',
-                hintStyle: GoogleFonts.poppins(color: kLightGrey, fontSize: 15, fontWeight: FontWeight.w400),
-                prefixIcon: Container(
-                  margin: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: kLightBlue, borderRadius: BorderRadius.circular(10)),
-                  child: const Icon(Icons.search_rounded, color: kPrimaryBlue, size: 20),
-                ),
-                filled: true,
-                fillColor: Colors.white,
-                contentPadding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(20.0), borderSide: BorderSide.none),
-                focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(20.0), borderSide: const BorderSide(color: kPrimaryBlue, width: 2)),
-              ),
-            ),
-          ).animate().fadeIn(delay: 600.ms).slideY(begin: -0.1),
           const SizedBox(height: 24),
           Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              child: _isSearchFocused
-                  ? _buildSuggestionsList()
-                  : IndexedStack(
-                      index: _selectedIndex,
-                      children: dashboardPages,
-                    ),
+            child: IndexedStack(
+              index: _selectedIndex,
+              children: dashboardPages,
             ),
           ),
         ],
@@ -281,25 +237,6 @@ class _SigningPageState extends State<SigningPage> {
     );
   }
 
-  Widget _buildSuggestionsList() {
-    return ListView.builder(
-      key: const ValueKey('suggestions'),
-      itemCount: _popularLocations.length,
-      itemBuilder: (context, index) {
-        final location = _popularLocations[index];
-        return ListTile(
-          leading: const Icon(Icons.location_on_outlined, color: kGreyText),
-          title: Text(location, style: GoogleFonts.poppins()),
-          onTap: () {
-            setState(() {
-              _searchController.text = location;
-              _searchFocusNode.unfocus();
-            });
-          },
-        );
-      },
-    ).animate().fadeIn();
-  }
   
   Widget _buildTopLeftBranding() {
     return Positioned(

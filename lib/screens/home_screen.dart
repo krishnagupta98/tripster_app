@@ -89,79 +89,84 @@ class _HomeScreenState extends State<HomeScreen> {
         backgroundColor: kBlue,
         elevation: 0,
       ),
-      body: Column(
-        children: [
-          // Quick Stats
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 500),
-            curve: Curves.easeInOut,
-            padding: const EdgeInsets.all(16.0),
-            decoration: BoxDecoration(
-              color: kGreen.withOpacity(0.05),
-              border: Border(
-                bottom: BorderSide(color: kGreen.withOpacity(0.2), width: 1),
+      body: SafeArea(
+        child: Column(
+          children: [
+            // Quick Stats
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 500),
+              curve: Curves.easeInOut,
+              padding: const EdgeInsets.all(16.0),
+              decoration: BoxDecoration(
+                color: kGreen.withOpacity(0.05),
+                border: Border(
+                  bottom: BorderSide(color: kGreen.withOpacity(0.2), width: 1),
+                ),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildStatCard(
+                    icon: Icons.directions_run,
+                    label: 'Distance',
+                    value: '${totalDistance.toStringAsFixed(1)} km',
+                    color: kBlue,
+                  ),
+                  _buildStatCard(
+                    icon: Icons.directions_walk,
+                    label: 'Steps',
+                    value: steps.toString(),
+                    color: kGreen,
+                  ),
+                  _buildStatCard(
+                    icon: Icons.access_time,
+                    label: 'Outdoors',
+                    value: _formatDuration(timeOutdoors),
+                    color: Colors.orange,
+                  ),
+                ],
               ),
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildStatCard(
-                  icon: Icons.directions_run,
-                  label: 'Distance',
-                  value: '${totalDistance.toStringAsFixed(1)} km',
-                  color: kBlue,
-                ),
-                _buildStatCard(
-                  icon: Icons.directions_walk,
-                  label: 'Steps',
-                  value: steps.toString(),
-                  color: kGreen,
-                ),
-                _buildStatCard(
-                  icon: Icons.access_time,
-                  label: 'Outdoors',
-                  value: _formatDuration(timeOutdoors),
-                  color: Colors.orange,
-                ),
-              ],
-            ),
-          ),
-          // Timeline
-          Expanded(
-            child: _isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(
-                      valueColor: AlwaysStoppedAnimation<Color>(kBlue),
-                    ),
-                  )
-                : _events.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.timeline,
-                              size: 64,
-                              color: Colors.grey[400],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No locations visited today',
-                              style: GoogleFonts.poppins(
-                                fontSize: 16,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                          ],
+            // Timeline
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 80.0), // Space for FAB
+                child: _isLoading
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(kBlue),
                         ),
                       )
-                    : TimelineView(
-                        events: _events,
-                        isFirst: true,
-                        isLast: true,
-                      ),
-          ),
-        ],
+                    : _events.isEmpty
+                        ? Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.timeline,
+                                  size: 64,
+                                  color: Colors.grey[400],
+                                ),
+                                const SizedBox(height: 16),
+                                Text(
+                                  'No locations visited today',
+                                  style: GoogleFonts.poppins(
+                                    fontSize: 16,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )
+                        : TimelineView(
+                            events: _events,
+                            isFirst: true,
+                            isLast: true,
+                          ),
+              ),
+            ),
+          ],
+        ),
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {

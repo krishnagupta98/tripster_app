@@ -13,6 +13,7 @@ import 'package:flutter_application_1/trip_details_page.dart';
 import 'dart:async';
 import 'explore_colors.dart' as exploreColors;
 import 'dart:math' as math;
+import 'package:intl/intl.dart';
 
 
 class ExploreMapView extends StatefulWidget {
@@ -164,11 +165,16 @@ class _ExploreMapViewState extends State<ExploreMapView> {
 
     // Filter Trips
     List<Trip> filteredTrips = [];
+    final lowerQuery = _searchQuery.toLowerCase();
     if (_searchQuery.isNotEmpty) {
-      filteredTrips = _allTrips.where((trip) =>
-        trip.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-        trip.location.toLowerCase().contains(_searchQuery.toLowerCase())
-      ).toList();
+      filteredTrips = _allTrips.where((trip) {
+        final nameMatch = trip.name.toLowerCase().contains(lowerQuery);
+        final locationMatch = trip.location.toLowerCase().contains(lowerQuery);
+        final dateFormatter = DateFormat('yyyy-MM-dd');
+        final formattedDate = dateFormatter.format(trip.plannedDate).toLowerCase();
+        final dateMatch = formattedDate.contains(lowerQuery);
+        return nameMatch || locationMatch || dateMatch;
+      }).toList();
     } else {
       filteredTrips = _allTrips.take(3).toList();
     }
@@ -399,7 +405,16 @@ class _ExploreMapViewState extends State<ExploreMapView> {
 
   Widget _buildTripsSection(List<Trip> trips) {
     if (trips.isEmpty) {
-      return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Text(
+          'No trips found',
+          style: GoogleFonts.poppins(
+            fontSize: 16,
+            color: exploreColors.kGreyText,
+          ),
+        ),
+      );
     }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -500,67 +515,80 @@ class _ExploreMapViewState extends State<ExploreMapView> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            // No filters
-            // Dynamic sections
-            recommendations.isEmpty
-                ? Padding(
-                    padding: const EdgeInsets.all(16.0),
+      body: Column(
+        children: [
+          // Search bar for trips
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: TextField(
+              onChanged: (value) => setState(() => _searchQuery = value),
+              decoration: InputDecoration(
+                hintText: 'Search trips by name, destination, or date...',
+                prefixIcon: const Icon(Icons.search),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear),
+                        onPressed: () => setState(() => _searchQuery = ''),
+                      )
+                    : null,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                filled: true,
+                fillColor: Colors.grey[100],
+              ),
+            ),
+          ),
+          // Dynamic sections
+          Expanded(
+            flex: 2,
+            child: recommendations.isEmpty
+                ? Center(
                     child: Text(
                       'No recommendations yet. Start exploring!',
                       style: GoogleFonts.poppins(color: exploreColors.kGreyText),
                     ),
                   )
-                : ListView.separated(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: 1,  // Single item for all sections
-                    separatorBuilder: (context, index) => const SizedBox(height: 16),
-                    itemBuilder: (context, index) {
-                      return Column(
-                        children: [
-                          if (matchingTrips.isNotEmpty) _buildTripsSection(matchingTrips),
-                          if (nearbyEats.isNotEmpty) _buildCategorySection('Nearby Eats', nearbyEats),
-                          if (hiddenGems.isNotEmpty) _buildCategorySection('Hidden Gems', hiddenGems),
-                          if (outdoorSpots.isNotEmpty) _buildCategorySection('Outdoor Spots', outdoorSpots),
-                        ],
-                      );
-                    },
-                  ),
-            // Map
-            SizedBox(
-              height: MediaQuery.of(context).size.height * 0.4,
-              child: Stack(
-                children: [
-                  FlutterMap(
-                    mapController: _mapController,
-                    options: MapOptions(
-                      initialCenter: _currentLocation ?? (_events.isNotEmpty && _events.first.coordinates != null ? _events.first.coordinates! : const LatLng(37.7749, -122.4194)),
-                      initialZoom: 12.0,
-                      minZoom: 2.0,
-                      maxZoom: 18.0,
-                      interactionOptions: const InteractionOptions(
-                        flags: InteractiveFlag.all,
-                      ),
-                    ),
+                : ListView(
                     children: [
-                      TileLayer(
-                        urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                        subdomains: const ['a', 'b', 'c'],
-                        userAgentPackageName: 'com.example.flutter_application_1',
-                      ),
-                      MarkerLayer(markers: _buildMarkers()),
+                      if (matchingTrips.isNotEmpty) _buildTripsSection(matchingTrips),
+                      if (nearbyEats.isNotEmpty) _buildCategorySection('Nearby Eats', nearbyEats),
+                      if (hiddenGems.isNotEmpty) _buildCategorySection('Hidden Gems', hiddenGems),
+                      if (outdoorSpots.isNotEmpty) _buildCategorySection('Outdoor Spots', outdoorSpots),
                     ],
                   ),
-                  _buildMapControls(),
-                  _buildPoiDetailsCard(),
-                ],
-              ),
+          ),
+          // Map
+          Expanded(
+            flex: 3,
+            child: Stack(
+              children: [
+                FlutterMap(
+                  mapController: _mapController,
+                  options: MapOptions(
+                    initialCenter: _currentLocation ?? (_events.isNotEmpty && _events.first.coordinates != null ? _events.first.coordinates! : const LatLng(37.7749, -122.4194)),
+                    initialZoom: 12.0,
+                    minZoom: 2.0,
+                    maxZoom: 18.0,
+                    interactionOptions: const InteractionOptions(
+                      flags: InteractiveFlag.all,
+                    ),
+                  ),
+                  children: [
+                    TileLayer(
+                      urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+                      subdomains: const ['a', 'b', 'c'],
+                      userAgentPackageName: 'com.example.flutter_application_1',
+                    ),
+                    MarkerLayer(markers: _buildMarkers()),
+                  ],
+                ),
+                _buildMapControls(),
+                _buildPoiDetailsCard(),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
