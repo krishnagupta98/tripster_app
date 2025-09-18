@@ -1,5 +1,6 @@
 // lib/previous_trip_details_page.dart
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
@@ -41,7 +42,6 @@ class _PreviousTripDetailsPageState extends State<PreviousTripDetailsPage>
 
   @override
   void dispose() {
-    _tabController.removeListener(() {});
     _tabController.dispose();
     super.dispose();
   }
@@ -148,6 +148,7 @@ class _PreviousTripDetailsPageState extends State<PreviousTripDetailsPage>
 
   Widget _buildExpensesTab() {
     return ListView(
+      physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16.0),
       children: [
         Card(
@@ -182,6 +183,7 @@ class _PreviousTripDetailsPageState extends State<PreviousTripDetailsPage>
 
   Widget _buildPhotosTab() {
     return GridView.builder(
+      physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.all(16),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
         crossAxisCount: 2,
@@ -307,7 +309,7 @@ class _TripRouteMapState extends State<TripRouteMap> {
           );
         }
       } catch (e) {
-        print("Could not geocode $locationName: $e");
+        debugPrint("Could not geocode $locationName: $e");
       }
     }
     

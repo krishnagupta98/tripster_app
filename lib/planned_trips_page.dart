@@ -6,6 +6,7 @@ import 'package:flutter_application_1/models/trip_model.dart';
 import 'package:flutter_application_1/services/database_helper.dart';
 import 'package:flutter_application_1/widgets/add_trip_form.dart';
 import 'package:flutter_application_1/widgets/planned_trips_view.dart';
+import 'package:flutter_application_1/trip_details_page.dart';
 
 // Using the new primary color for consistency
 const Color kPrimaryBlue = Color(0xFF1E40AF);
@@ -30,7 +31,7 @@ class _PlannedTripsPageState extends State<PlannedTripsPage> {
   Future<void> _loadTrips() async {
     try {
       final dbHelper = DatabaseHelper();
-      final trips = await dbHelper.getAllTrips();
+      final trips = await dbHelper.getPlannedTrips();
       setState(() {
         _trips = trips;
         _isLoading = false;
@@ -127,6 +128,12 @@ class _PlannedTripsPageState extends State<PlannedTripsPage> {
         itemBuilder: (context, index) {
           final trip = _trips[index];
           return ListTile(
+            onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => TripDetailsPage(trip: trip),
+              ),
+            ),
             leading: CircleAvatar(
               backgroundImage: NetworkImage(trip.imageUrl),
             ),

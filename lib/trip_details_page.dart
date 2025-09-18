@@ -4,8 +4,11 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_application_1/models/trip_model.dart';
+import 'package:flutter_application_1/models/previous_trip_model.dart';
 import 'package:flutter_application_1/services/database_helper.dart';
 import 'package:flutter_application_1/ongoing_trip_page.dart'; // Assume this exists
+import 'package:flutter_application_1/previous_trips_page.dart';
+import 'package:flutter_application_1/previous_trips_details_page.dart';
 
 const Color kPrimaryBlue = Color(0xFF1E40AF);
 const Color kDarkBlue = Color(0xFF1E3A8A);
@@ -66,6 +69,59 @@ class _TripDetailsPageState extends State<TripDetailsPage> {
       }
     }
   }
+  
+  Future<void> _finishTrip() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Finish Trip'),
+        content: Text('Mark "${_trip.name}" as completed without starting?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Finish', style: TextStyle(color: Colors.green)),
+          ),
+        ],
+      ),
+    );
+ 
+    if (confirm == true) {
+      try {
+        final completedTrip = _trip.copyWith(status: 'completed');
+        final dbHelper = DatabaseHelper();
+        await dbHelper.updateTrip(completedTrip);
+ 
+        // Create basic previous trip record
+        final prevTrip = PreviousTrip(
+          baseTrip: completedTrip,
+          route: [],
+          expenses: [],
+          photos: [],
+        );
+        await dbHelper.insertPreviousTrip(prevTrip);
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Trip marked as completed!')),
+          );
+          Navigator.push(
+            context,
+            MaterialPageRoute(builder: (context) => PreviousTripDetailsPage(trip: prevTrip)),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error finishing trip: $e')),
+          );
+        }
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -85,7 +141,7 @@ class _TripDetailsPageState extends State<TripDetailsPage> {
                 child: CachedNetworkImage(
                   imageUrl: _trip.imageUrl,
                   fit: BoxFit.cover,
-                  color: Colors.black.withValues(alpha: 0.4),
+                  color: Colors.black.withOpacity(0.4),
                   colorBlendMode: BlendMode.darken,
                 ),
               ),
@@ -132,12 +188,27 @@ class _TripDetailsPageState extends State<TripDetailsPage> {
         ],
       ),
       floatingActionButton: _trip.status == 'planned'
-        ? FloatingActionButton.extended(
-            onPressed: _startTrip,
-            backgroundColor: kPrimaryBlue,
-            foregroundColor: Colors.white,
-            icon: const Icon(Icons.play_arrow),
-            label: Text('Start Trip', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+        ? Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              FloatingActionButton.extended(
+                heroTag: 'start',
+                onPressed: _startTrip,
+                backgroundColor: kPrimaryBlue,
+                foregroundColor: Colors.white,
+                icon: const Icon(Icons.play_arrow),
+                label: Text('Start Trip', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+              ),
+              const SizedBox(height: 10),
+              FloatingActionButton.extended(
+                heroTag: 'finish',
+                onPressed: _finishTrip,
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+                icon: const Icon(Icons.check),
+                label: Text('Finish Trip', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+              ),
+            ],
           )
         : null,
     );

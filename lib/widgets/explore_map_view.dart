@@ -1,20 +1,32 @@
 // lib/widgets/explore_map_view.dart
 import 'package:flutter/material.dart';
-import 'package:flutter_application_1/models/point_of_interest_model.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_application_1/models/trip_model.dart';
 import 'package:flutter_application_1/services/database_helper.dart';
 import 'package:flutter_application_1/services/location_service.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:flutter_map/flutter_map.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:flutter_application_1/services/timeline_service.dart';
 import 'package:flutter_application_1/models/timeline_event.dart';
-import 'package:flutter_application_1/trip_details_page.dart';
 import 'dart:async';
-import 'explore_colors.dart' as exploreColors;
-import 'dart:math' as math;
-import 'package:intl/intl.dart';
+import 'package:flutter_application_1/models/point_of_interest_model.dart';
+import 'package:flutter_application_1/models/previous_trip_model.dart';
+import 'explore_colors.dart' as explore_colors;
+import 'package:flutter_application_1/trip_details_page.dart';
+import 'package:flutter_application_1/previous_trips_details_page.dart';
 
+class SearchResult {
+  final String type; // 'poi', 'trip', 'prev_trip'
+  final dynamic item;
+  final double relevance;
+  SearchResult({
+    required this.type,
+    required this.item,
+    required this.relevance,
+  });
+}
 
 class ExploreMapView extends StatefulWidget {
   const ExploreMapView({super.key});
@@ -30,11 +42,60 @@ class _ExploreMapViewState extends State<ExploreMapView> {
   final DatabaseHelper _dbHelper = DatabaseHelper();
   final LocationService _locationService = LocationService();
   StreamSubscription<List<TimelineEvent>>? _eventSubscription;
-  List<TimelineEvent> _events = [];
-  List<Trip> _allTrips = [];
-  List<PointOfInterest> _allPois = [];
+  late List<TimelineEvent> _events;
+  late List<Trip> _allTrips;
+  late List<PointOfInterest> _allPois;
+  late List<PreviousTrip> _allPreviousTrips;
   LatLng? _currentLocation;
   String _searchQuery = '';
+
+  @override
+  void initState() {
+    super.initState();
+    _events = [];
+    _allTrips = [];
+    _allPois = [];
+    _allPreviousTrips = [];
+    _loadData();
+    _eventSubscription = _timelineService.timelineStream.listen((events) {
+      if (mounted) {
+        setState(() {
+          _events = events;
+        });
+      }
+      _updateCurrentLocation();
+    });
+    _locationService.getCurrentLocation().then((location) {
+      if (mounted && location != null) {
+        final latLng = LatLng(location.latitude, location.longitude);
+        setState(() {
+          _currentLocation = latLng;
+        });
+        _mapController.move(latLng, 13.0);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _eventSubscription?.cancel();
+    _timelineService.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadData() async {
+    await Future.wait([
+      _loadTrips(),
+      _loadPois(),
+      _loadPreviousTrips(),
+    ]);
+    _updateCurrentLocation();
+  }
+  
+  Future<void> _loadPreviousTrips() async {
+    _allPreviousTrips = await _dbHelper.getPreviousTrips();
+    if (mounted) setState(() {});
+  }
 
   Future<void> _loadTrips() async {
     _allTrips = await _dbHelper.getAllTrips();
@@ -45,80 +106,12 @@ class _ExploreMapViewState extends State<ExploreMapView> {
   Future<void> _loadPois() async {
     _allPois = await _dbHelper.getAllPois();
     if (_allPois.isEmpty) {
-      // Seed mock data
+      // Seed mock data if database is empty
       final mockPois = [
-        PointOfInterest(
-          name: "Local Cafe",
-          category: PoiCategory.cafe,
-          coordinates: LatLng(37.7749, -122.4194),
-          imageUrl: 'https://via.placeholder.com/300x200?text=Cafe',
-          rating: 4.5,
-          description: 'Cozy spot for coffee',
-        ),
-        PointOfInterest(
-          name: "Street Food Stall",
-          category: PoiCategory.cafe,
-          coordinates: LatLng(37.7849, -122.4094),
-          imageUrl: 'https://via.placeholder.com/300x200?text=Food',
-          rating: 4.0,
-          description: 'Delicious local eats',
-        ),
-        PointOfInterest(
-          name: "Hidden Alley Art",
-          category: PoiCategory.attraction,
-          coordinates: LatLng(37.7649, -122.4294),
-          imageUrl: 'https://via.placeholder.com/300x200?text=Art',
-          rating: 4.8,
-          description: 'Secret street art',
-        ),
-        PointOfInterest(
-          name: "Vintage Bookstore",
-          category: PoiCategory.attraction,
-          coordinates: LatLng(37.7949, -122.3994),
-          imageUrl: 'https://via.placeholder.com/300x200?text=Books',
-          rating: 4.7,
-          description: 'Rare finds await',
-        ),
-        PointOfInterest(
-          name: "City Park",
-          category: PoiCategory.park,
-          coordinates: LatLng(37.7549, -122.4394),
-          imageUrl: 'https://via.placeholder.com/300x200?text=Park',
-          rating: 4.6,
-          description: 'Relax in nature',
-        ),
-        PointOfInterest(
-          name: "Riverside Trail",
-          category: PoiCategory.park,
-          coordinates: LatLng(37.8049, -122.3894),
-          imageUrl: 'https://via.placeholder.com/300x200?text=Trail',
-          rating: 4.9,
-          description: 'Scenic walking path',
-        ),
-        PointOfInterest(
-          name: "Eiffel Tower",
-          category: PoiCategory.attraction,
-          coordinates: LatLng(48.8584, 2.2945),
-          imageUrl: 'https://via.placeholder.com/300x200?text=Eiffel',
-          rating: 5.0,
-          description: 'Iconic landmark',
-        ),
-        PointOfInterest(
-          name: "Statue of Liberty",
-          category: PoiCategory.attraction,
-          coordinates: LatLng(40.6892, -74.0445),
-          imageUrl: 'https://via.placeholder.com/300x200?text=Liberty',
-          rating: 4.9,
-          description: 'Symbol of freedom',
-        ),
-        PointOfInterest(
-          name: "Taj Mahal",
-          category: PoiCategory.attraction,
-          coordinates: LatLng(27.1751, 78.0421),
-          imageUrl: 'https://via.placeholder.com/300x200?text=Taj',
-          rating: 5.0,
-          description: 'Architectural marvel',
-        ),
+        PointOfInterest(name: "Local Cafe", category: PoiCategory.cafe, coordinates: const LatLng(37.7749, -122.4194), imageUrl: 'https://images.unsplash.com/photo-1559925393-8be0ec4767c8?w=500', rating: 4.5, description: 'Cozy spot for single-origin coffee and pastries.'),
+        PointOfInterest(name: "City Park", category: PoiCategory.park, coordinates: const LatLng(37.7549, -122.4394), imageUrl: 'https://images.unsplash.com/photo-1597852074332-9311b3e155b9?w=500', rating: 4.6, description: 'A beautiful green space perfect for picnics and relaxation.'),
+        PointOfInterest(name: "Hidden Alley Art", category: PoiCategory.attraction, coordinates: const LatLng(37.7649, -122.4294), imageUrl: 'https://images.unsplash.com/photo-1558899478-43b378038b8a?w=500', rating: 4.8, description: 'Discover a vibrant collection of secret street art murals.'),
+        PointOfInterest(name: "Taj Mahal", category: PoiCategory.attraction, coordinates: const LatLng(27.1751, 78.0421), imageUrl: 'https://images.unsplash.com/photo-1564507592333-c60657eea523?w=500', rating: 5.0, description: 'An immense mausoleum of white marble, an icon of Mughal architecture.'),
       ];
       for (final poi in mockPois) {
         await _dbHelper.insertPoi(poi);
@@ -128,546 +121,468 @@ class _ExploreMapViewState extends State<ExploreMapView> {
     if (mounted) setState(() {});
   }
 
-  List<dynamic> get _filteredRecommendations {
-    List<dynamic> recommendations = [];
-    List<PointOfInterest> filteredPois = [];
-    final currentPos = _currentLocation ?? (_events.isNotEmpty && _events.first.coordinates != null ? _events.first.coordinates : null);
-
-    if (currentPos != null) {
-      Map<PointOfInterest, double> minDistances = {};
-      for (final poi in _allPois) {
-        final distanceKm = Distance().as(LengthUnit.Kilometer, currentPos, poi.coordinates);
-        if (distanceKm > 50) continue;
-
-        if (true) {  // No category or distance filters
-          minDistances[poi] = math.min(minDistances[poi] ?? double.infinity, distanceKm);
-        }
-      }
-      // Apply search filter and sort by min distance
-      var poiWithDist = minDistances.entries
-          .where((entry) {
-            final poi = entry.key;
-            return _searchQuery.isEmpty || poi.name.toLowerCase().contains(_searchQuery.toLowerCase());
-          })
-          .toList()
-        ..sort((a, b) => a.value.compareTo(b.value));
-      filteredPois = poiWithDist.map((e) => e.key).toList();  // Show all, not just top 5
-    } else if (_searchQuery.isNotEmpty) {
-      // Fallback search
-      final defaultCenter = LatLng(37.7749, -122.4194);
-      filteredPois = _allPois.where((poi) {
-        bool searchMatch = poi.name.toLowerCase().contains(_searchQuery.toLowerCase());
-        return searchMatch;
-      }).toList()
-        ..sort((a, b) => Distance().as(LengthUnit.Meter, a.coordinates, defaultCenter)
-            .compareTo(Distance().as(LengthUnit.Meter, b.coordinates, defaultCenter)));
-    }
-
-    // Filter Trips
-    List<Trip> filteredTrips = [];
-    final lowerQuery = _searchQuery.toLowerCase();
-    if (_searchQuery.isNotEmpty) {
-      filteredTrips = _allTrips.where((trip) {
-        final nameMatch = trip.name.toLowerCase().contains(lowerQuery);
-        final locationMatch = trip.location.toLowerCase().contains(lowerQuery);
-        final dateFormatter = DateFormat('yyyy-MM-dd');
-        final formattedDate = dateFormatter.format(trip.plannedDate).toLowerCase();
-        final dateMatch = formattedDate.contains(lowerQuery);
-        return nameMatch || locationMatch || dateMatch;
-      }).toList();
-    } else {
-      filteredTrips = _allTrips.take(3).toList();
-    }
-
-    // Combine
-    recommendations.addAll(filteredPois);
-    recommendations.addAll(filteredTrips);
-
-    return recommendations;
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _loadTrips();
-    _loadPois();
-    _loadCurrentLocation();
-    _initializeTimeline();
-  }
-
-  Future<void> _loadCurrentLocation() async {
-    try {
-      final position = await _locationService.getCurrentLocation();
-      if (position != null && mounted) {
-        setState(() {
-          _currentLocation = LatLng(position.latitude, position.longitude);
-        });
-      }
-    } catch (e) {
-      print('Error loading current location: $e');
-    }
-  }
-
-  @override
-  void dispose() {
-    _eventSubscription?.cancel();
-    _timelineService.dispose();
-    super.dispose();
-  }
-
-  Future<void> _initializeTimeline() async {
-    await _timelineService.initialize();
-    _eventSubscription = _timelineService.timelineStream.listen((events) {
+  void _updateCurrentLocation() {
+    if (_currentLocation == null && _events.isNotEmpty && _events.first.coordinates != null) {
       if (mounted) {
         setState(() {
-          _events = events;
+          _currentLocation = _events.first.coordinates;
         });
       }
-    });
-    await _timelineService.updateTimelineNow();
-  }
-
-  Future<void> _refreshTimeline() async {
-    await _timelineService.updateTimelineNow();
-  }
-
-  void _onPoiTap(PointOfInterest poi) {
-    setState(() {
-      _selectedPoi = poi;
-    });
-    _mapController.move(poi.coordinates, 15.0);
-  }
-
-  List<Marker> _buildMarkers() {
-    final markers = <Marker>[];
-    // Current location marker
-    if (_currentLocation != null) {
-      markers.add(
-        Marker(
-          point: _currentLocation!,
-          width: 40,
-          height: 40,
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.blue,
-              shape: BoxShape.circle,
-              border: Border.all(color: Colors.white, width: 2),
-            ),
-            child: const Icon(Icons.my_location, color: Colors.white, size: 20),
-          ),
-        ),
-      );
     }
-    // Timeline event markers
-    for (final event in _events) {
-      if (event.coordinates != null) {
-        markers.add(
-          Marker(
-            point: event.coordinates!,
-            width: 30,
-            height: 30,
-            child: Icon(Icons.location_on, color: Colors.blue, size: 30),
-          ),
-        );
+  }
+
+  List<PointOfInterest> get _filteredPois {
+    if (_searchQuery.isEmpty) return _allPois.take(10).toList();
+    final query = _searchQuery.toLowerCase();
+    final currentPos = _currentLocation ?? const LatLng(37.7749, -122.4194);
+    final filtered = <PointOfInterest>[];
+    for (final poi in _allPois) {
+      final distanceKm = const Distance().as(LengthUnit.Kilometer, currentPos, poi.coordinates);
+      if (distanceKm <= 50) {
+        bool matches = (poi.name?.toLowerCase() ?? '').contains(query) ||
+                       (poi.description?.toLowerCase() ?? '').contains(query);
+        if (matches) {
+          filtered.add(poi);
+        }
       }
     }
-    // Filtered POI markers
-    final filteredPois = _filteredRecommendations.whereType<PointOfInterest>().toList();
-    for (final poi in filteredPois) {
-      markers.add(
-        Marker(
-          point: poi.coordinates,
-          width: 40,
-          height: 40,
-          child: GestureDetector(
-            onTap: () => _onPoiTap(poi),
-            child: Container(
-              decoration: BoxDecoration(
-                color: _getPoiColor(poi.category),
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 2),
-              ),
-              child: Icon(poi.icon, color: Colors.white, size: 20),
-            ),
-          ),
-        ),
-      );
+    filtered.sort((a, b) {
+      final distA = const Distance().as(LengthUnit.Kilometer, currentPos, a.coordinates);
+      final distB = const Distance().as(LengthUnit.Kilometer, currentPos, b.coordinates);
+      return distA.compareTo(distB);
+    });
+    return filtered.take(10).toList();
+  }
+  
+  List<SearchResult> get _searchResults {
+    if (_searchQuery.isEmpty) return [];
+    final query = _searchQuery.toLowerCase();
+    final results = <SearchResult>[];
+    final currentPos = _currentLocation ?? const LatLng(37.7749, -122.4194);
+  
+    // POIs
+    for (final poi in _allPois) {
+      final distKm = const Distance().as(LengthUnit.Kilometer, currentPos, poi.coordinates);
+      if (distKm <= 50) {
+        double relevance = 0.0;
+        if ((poi.name?.toLowerCase() ?? '').contains(query)) relevance += 1.0;
+        if ((poi.description?.toLowerCase() ?? '').contains(query)) relevance += 0.5;
+        if (relevance > 0) {
+          relevance -= (distKm / 100).clamp(0.0, 0.5); // Penalize distance
+          results.add(SearchResult(type: 'poi', item: poi, relevance: relevance));
+        }
+      }
     }
-    return markers;
+  
+    // Trips
+    for (final trip in _allTrips) {
+      double relevance = 0.0;
+      if (trip.name.toLowerCase().contains(query)) relevance += 1.0;
+      if (trip.location.toLowerCase().contains(query)) relevance += 0.8;
+      if (trip.notes.toLowerCase().contains(query)) relevance += 0.5;
+      final actsStr = trip.activities.join(' ').toLowerCase();
+      if (actsStr.contains(query)) relevance += 0.3;
+      if (relevance > 0) {
+        results.add(SearchResult(type: 'trip', item: trip, relevance: relevance));
+      }
+    }
+  
+    // Previous Trips
+    for (final prev in _allPreviousTrips) {
+      final trip = prev.baseTrip;
+      double relevance = 0.0;
+      if (trip.name.toLowerCase().contains(query)) relevance += 1.0;
+      if (trip.location.toLowerCase().contains(query)) relevance += 0.8;
+      if (trip.notes.toLowerCase().contains(query)) relevance += 0.5;
+      final actsStr = trip.activities.join(' ').toLowerCase();
+      if (actsStr.contains(query)) relevance += 0.3;
+      final routeStr = prev.route.join(' ').toLowerCase();
+      if (routeStr.contains(query)) relevance += 0.6;
+      if (relevance > 0) {
+        results.add(SearchResult(type: 'prev_trip', item: prev, relevance: relevance));
+      }
+    }
+  
+    results.sort((a, b) => b.relevance.compareTo(a.relevance));
+    print('DEBUG: Search "$_searchQuery" returned ${results.length} results');
+    return results.take(20).toList();
   }
 
-  Color _getPoiColor(PoiCategory category) {
-    switch (category) {
-      case PoiCategory.cafe:
-        return exploreColors.kGreen;
-      case PoiCategory.attraction:
-        return kPrimaryBlue;
-      case PoiCategory.park:
-        return Colors.orange;
-      default:
-        return kDarkBlue;
-    }
-  }
-
-  Widget _buildCategorySection(String title, List<PointOfInterest> pois) {
-    if (pois.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Text(
-            title,
-            style: GoogleFonts.poppins(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: kDarkBlue,
-            ),
-          ),
-        ),
-        SizedBox(
-          height: 200,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: pois.length,
-            itemBuilder: (context, index) {
-              final poi = pois[index];
-              return Padding(
-                padding: const EdgeInsets.only(right: 16.0),
-                child: GestureDetector(
-                  onTap: () => _onPoiTap(poi),
-                  child: Card(
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    child: SizedBox(
-                      width: 160,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          ClipRRect(
-                            borderRadius: const BorderRadius.vertical(top: Radius.circular(12)),
-                            child: Image.network(
-                              poi.imageUrl ?? 'https://via.placeholder.com/160x100',
-                              height: 100,
-                              width: 160,
-                              fit: BoxFit.cover,
-                              errorBuilder: (context, error, stackTrace) => Container(
-                                height: 100,
-                                color: Colors.grey[300],
-                                child: const Icon(Icons.image_not_supported),
-                              ),
-                            ),
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  poi.name,
-                                  style: GoogleFonts.poppins(fontSize: 14, fontWeight: FontWeight.bold),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                Text(
-                                  poi.description ?? '',
-                                  style: GoogleFonts.poppins(fontSize: 12, color: exploreColors.kGreyText),
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                                Row(
-                                  children: [
-                                    const Icon(Icons.star, size: 16, color: Colors.amber),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      '${poi.rating ?? 0.0}',
-                                      style: GoogleFonts.poppins(fontSize: 12),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
+  void _onPoiSelected(PointOfInterest poi) {
+    setState(() => _selectedPoi = poi);
+    _mapController.move(poi.coordinates, 15.0);
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.4, minChildSize: 0.2, maxChildSize: 0.9,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(color: Colors.white, borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+          child: SingleChildScrollView(
+            controller: scrollController,
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)))),
+                const SizedBox(height: 16),
+                Text(poi.name ?? '', style: GoogleFonts.poppins(fontSize: 24, fontWeight: FontWeight.bold, color: explore_colors.kPrimaryBlue)),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(Icons.star, color: Colors.amber, size: 20),
+                    const SizedBox(width: 4),
+                    Text('${poi.rating}', style: GoogleFonts.poppins(fontSize: 16)),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                Text(poi.description ?? '', style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[600])),
+                const SizedBox(height: 16),
+                SizedBox(
+                  height: 200,
+                  width: double.infinity,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: CachedNetworkImage(
+                      imageUrl: poi.imageUrl ?? '',
+                      fit: BoxFit.cover,
+                      errorWidget: (context, url, error) => Container(color: Colors.grey[300], child: const Icon(Icons.image_not_supported)),
                     ),
                   ),
                 ),
-              );
-            },
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Added ${poi.name} to trip'), backgroundColor: explore_colors.kPrimaryBlue));
+                      Navigator.pop(context);
+                    },
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: explore_colors.kPrimaryBlue,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 12)),
+                    child: Text('Add to Trip', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-      ],
+      ),
+    ).whenComplete(() => setState(() => _selectedPoi = null));
+  }
+
+  void _onTripSelected(Trip trip) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.5,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: SingleChildScrollView(
+            controller: scrollController,
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  trip.name,
+                  style: GoogleFonts.poppins(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: explore_colors.kPrimaryBlue,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${trip.location} • ${trip.plannedDate.day}/${trip.plannedDate.month}/${trip.plannedDate.year} - ${trip.endDate.day}/${trip.endDate.month}/${trip.endDate.year}',
+                  style: GoogleFonts.poppins(fontSize: 16, color: Colors.grey[600]),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  trip.notes.isNotEmpty ? trip.notes : 'No notes',
+                  style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[700]),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Activities:',
+                  style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 8),
+                ...trip.activities.map((act) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 2),
+                  child: Text('• $act', style: GoogleFonts.poppins(fontSize: 14)),
+                )),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => TripDetailsPage(trip: trip)),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: explore_colors.kPrimaryBlue,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    child: Text('View Details', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 
-  Widget _buildTripsSection(List<Trip> trips) {
-    if (trips.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Text(
-          'No trips found',
-          style: GoogleFonts.poppins(
-            fontSize: 16,
-            color: exploreColors.kGreyText,
+  void _onPrevTripSelected(PreviousTrip prevTrip) {
+    final trip = prevTrip.baseTrip;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.5,
+        minChildSize: 0.3,
+        maxChildSize: 0.9,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
-        ),
-      );
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Text(
-            'Matching Trips',
-            style: GoogleFonts.poppins(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: kDarkBlue,
-            ),
-          ),
-        ),
-        SizedBox(
-          height: 200,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            itemCount: trips.length,
-            itemBuilder: (context, index) {
-              final trip = trips[index];
-              return Padding(
-                padding: const EdgeInsets.only(right: 16.0),
-                child: GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => TripDetailsPage(trip: trip),
-                      ),
-                    );
-                  },
-                  child: Card(
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    child: SizedBox(
-                      width: 160,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.trip_origin, size: 32, color: kPrimaryBlue),
-                            const SizedBox(height: 8),
-                            Text(
-                              trip.name,
-                              style: GoogleFonts.poppins(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              trip.location,
-                              style: GoogleFonts.poppins(
-                                fontSize: 14,
-                                color: exploreColors.kGreyText,
-                              ),
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
-                      ),
+          child: SingleChildScrollView(
+            controller: scrollController,
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[300],
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
                 ),
-              );
-            },
+                const SizedBox(height: 16),
+                Text(
+                  trip.name,
+                  style: GoogleFonts.poppins(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: explore_colors.kPrimaryBlue,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  '${trip.location} • Completed',
+                  style: GoogleFonts.poppins(fontSize: 16, color: Colors.grey[600]),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  'Total Expenses: \$${prevTrip.totalExpenses.toStringAsFixed(2)}',
+                  style: GoogleFonts.poppins(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.green),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Route: ${prevTrip.route.join(' → ')}',
+                  style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[700]),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  trip.notes.isNotEmpty ? trip.notes : 'No notes',
+                  style: GoogleFonts.poppins(fontSize: 14, color: Colors.grey[700]),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (context) => PreviousTripDetailsPage(trip: prevTrip)),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: explore_colors.kPrimaryBlue,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    child: Text('View Details', style: GoogleFonts.poppins(fontWeight: FontWeight.w600)),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
-      ],
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final recommendations = _filteredRecommendations;
-    final nearbyEats = recommendations.where((r) => r is PointOfInterest && r.category == PoiCategory.cafe).cast<PointOfInterest>().toList();
-    final hiddenGems = recommendations.where((r) => r is PointOfInterest && r.category == PoiCategory.attraction).cast<PointOfInterest>().toList();
-    final outdoorSpots = recommendations.where((r) => r is PointOfInterest && r.category == PoiCategory.park).cast<PointOfInterest>().toList();
-    final matchingTrips = recommendations.where((r) => r is Trip).cast<Trip>().toList();
-
+    final center = _currentLocation ?? const LatLng(37.7749, -122.4194);
+    final filteredPois = _filteredPois;
+    final searchResults = _searchResults;
     return Scaffold(
+      extendBodyBehindAppBar: true,
       appBar: AppBar(
-        title: const Text('Explore', style: TextStyle(color: Colors.white)),
-        backgroundColor: kPrimaryBlue,
+        title: TextField(
+          onChanged: (value) {
+            setState(() => _searchQuery = value);
+            print('DEBUG: Search query updated to: $value');
+          },
+          decoration: InputDecoration(
+            hintText: 'Search places, trips...',
+            hintStyle: GoogleFonts.poppins(color: Colors.grey[400]),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(25), borderSide: BorderSide.none),
+            filled: true,
+            fillColor: Colors.white,
+            prefixIcon: const Icon(Icons.search, color: Colors.grey),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+          ),
+          style: GoogleFonts.poppins(),
+        ),
+        backgroundColor: Colors.transparent,
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh, color: Colors.white),
-            onPressed: _refreshTimeline,
-          ),
-        ],
+        toolbarHeight: 70,
       ),
-      body: Column(
-        children: [
-          // Search bar for trips
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              onChanged: (value) => setState(() => _searchQuery = value),
-              decoration: InputDecoration(
-                hintText: 'Search trips by name, destination, or date...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () => setState(() => _searchQuery = ''),
-                      )
-                    : null,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                filled: true,
-                fillColor: Colors.grey[100],
-              ),
-            ),
-          ),
-          // Dynamic sections
-          Expanded(
-            flex: 2,
-            child: recommendations.isEmpty
-                ? Center(
-                    child: Text(
-                      'No recommendations yet. Start exploring!',
-                      style: GoogleFonts.poppins(color: exploreColors.kGreyText),
-                    ),
-                  )
-                : ListView(
-                    children: [
-                      if (matchingTrips.isNotEmpty) _buildTripsSection(matchingTrips),
-                      if (nearbyEats.isNotEmpty) _buildCategorySection('Nearby Eats', nearbyEats),
-                      if (hiddenGems.isNotEmpty) _buildCategorySection('Hidden Gems', hiddenGems),
-                      if (outdoorSpots.isNotEmpty) _buildCategorySection('Outdoor Spots', outdoorSpots),
-                    ],
-                  ),
-          ),
-          // Map
-          Expanded(
-            flex: 3,
-            child: Stack(
+      body: SafeArea(
+        top: false,
+        child: Stack(
+          children: [
+            FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(initialCenter: center, initialZoom: 13.0),
               children: [
-                FlutterMap(
-                  mapController: _mapController,
-                  options: MapOptions(
-                    initialCenter: _currentLocation ?? (_events.isNotEmpty && _events.first.coordinates != null ? _events.first.coordinates! : const LatLng(37.7749, -122.4194)),
-                    initialZoom: 12.0,
-                    minZoom: 2.0,
-                    maxZoom: 18.0,
-                    interactionOptions: const InteractionOptions(
-                      flags: InteractiveFlag.all,
-                    ),
-                  ),
-                  children: [
-                    TileLayer(
-                      urlTemplate: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      subdomains: const ['a', 'b', 'c'],
-                      userAgentPackageName: 'com.example.flutter_application_1',
-                    ),
-                    MarkerLayer(markers: _buildMarkers()),
-                  ],
+                TileLayer(
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.example.flutter_application_1',
                 ),
-                _buildMapControls(),
-                _buildPoiDetailsCard(),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMapControls() {
-    return Positioned(
-      bottom: 20,
-      right: 20,
-      child: Column(
-        children: [
-          FloatingActionButton.small(
-            heroTag: 'zoomIn',
-            onPressed: () => _mapController.move(_mapController.center, _mapController.zoom + 1),
-            backgroundColor: Colors.white,
-            child: const Icon(Icons.add, color: kDarkBlue),
-          ),
-          const SizedBox(height: 8),
-          FloatingActionButton.small(
-            heroTag: 'zoomOut',
-            onPressed: () => _mapController.move(_mapController.center, _mapController.zoom - 1),
-            backgroundColor: Colors.white,
-            child: const Icon(Icons.remove, color: kDarkBlue),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPoiDetailsCard() {
-    if (_selectedPoi == null) return const SizedBox.shrink();
-
-    return AnimatedPositioned(
-      duration: const Duration(milliseconds: 400),
-      curve: Curves.easeInOutCubic,
-      bottom: 20,
-      left: 20,
-      right: 20,
-      child: Card(
-        elevation: 10,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Padding(
-          padding: const EdgeInsets.all(12.0),
-          child: Row(
-            children: [
-              CircleAvatar(
-                backgroundColor: kPrimaryBlue.withOpacity(0.1),
-                child: Icon(_selectedPoi!.icon, color: kPrimaryBlue),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _selectedPoi!.name,
-                      style: GoogleFonts.poppins(fontSize: 16, fontWeight: FontWeight.w600, color: kDarkBlue),
-                    ),
-                    Text(
-                      _selectedPoi!.description ?? '',
-                      style: GoogleFonts.poppins(fontSize: 12, color: exploreColors.kGreyText),
-                    ),
-                    if (_selectedPoi!.rating != null)
-                      Row(
-                        children: [
-                          const Icon(Icons.star, size: 16, color: Colors.amber),
-                          const SizedBox(width: 4),
-                          Text('${_selectedPoi!.rating}'),
-                        ],
+                MarkerLayer(
+                  markers: [
+                    ...filteredPois.map((poi) => Marker(
+                          point: poi.coordinates,
+                          width: 40, height: 40,
+                          child: GestureDetector(
+                            onTap: () => _onPoiSelected(poi),
+                            child: const Icon(Icons.location_pin, color: explore_colors.kPrimaryBlue, size: 40),
+                          ),
+                        )),
+                    if (_currentLocation != null)
+                      Marker(
+                        point: _currentLocation!,
+                        width: 40, height: 40,
+                        child: const Icon(Icons.my_location, color: Colors.blue, size: 30),
                       ),
                   ],
                 ),
+              ],
+            ),
+            if (_searchQuery.isNotEmpty && searchResults.isNotEmpty)
+              Positioned(
+                top: 80,
+                left: 10,
+                right: 10,
+                child: Container(
+                  height: 200,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 10,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                  child: ListView.builder(
+                    itemCount: searchResults.length,
+                    itemBuilder: (context, index) {
+                      final result = searchResults[index];
+                      if (result.type == 'poi') {
+                        final poi = result.item as PointOfInterest;
+                        return ListTile(
+                          leading: const Icon(Icons.location_pin, color: explore_colors.kPrimaryBlue),
+                          title: Text(poi.name ?? ''),
+                          subtitle: Text(poi.description ?? ''),
+                          onTap: () => _onPoiSelected(poi),
+                        );
+                      } else if (result.type == 'trip') {
+                        final trip = result.item as Trip;
+                        return ListTile(
+                          leading: const Icon(Icons.flight, color: Colors.blue),
+                          title: Text(trip.name),
+                          subtitle: Text(trip.location),
+                          onTap: () => _onTripSelected(trip),
+                        );
+                      } else if (result.type == 'prev_trip') {
+                        final prev = result.item as PreviousTrip;
+                        final trip = prev.baseTrip;
+                        return ListTile(
+                          leading: const Icon(Icons.history, color: Colors.green),
+                          title: Text(trip.name),
+                          subtitle: Text('${trip.location} • \$${prev.totalExpenses.toStringAsFixed(2)}'),
+                          onTap: () => _onPrevTripSelected(prev),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                ),
               ),
-              IconButton(
-                icon: const Icon(Icons.close, color: exploreColors.kGreyText),
-                onPressed: () => setState(() => _selectedPoi = null),
-              ),
-            ],
-          ),
+          ],
         ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          _locationService.getCurrentLocation().then((location) {
+            if (location != null && mounted) {
+              final latLng = LatLng(location.latitude, location.longitude);
+              setState(() => _currentLocation = latLng);
+              _mapController.move(latLng, 13.0);
+            }
+          });
+        },
+        backgroundColor: explore_colors.kPrimaryBlue,
+        foregroundColor: Colors.white,
+        child: const Icon(Icons.my_location),
       ),
     );
   }

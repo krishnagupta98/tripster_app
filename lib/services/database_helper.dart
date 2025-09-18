@@ -5,7 +5,9 @@ import 'package:sqflite/sqflite.dart';
 import '../models/trip_model.dart';
 import '../models/point_of_interest_model.dart';
 import '../models/timeline_event.dart';
+import '../models/previous_trip_model.dart';
 import 'package:latlong2/latlong.dart';
+import 'package:flutter/material.dart';
 
 class DatabaseHelper {
   static final DatabaseHelper _instance = DatabaseHelper._internal();
@@ -25,7 +27,7 @@ class DatabaseHelper {
   
     Database database = await openDatabase(
       dbPath,
-      version: 5,
+      version: 6,
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -38,7 +40,7 @@ class DatabaseHelper {
     return result.isNotEmpty;
   }
 
-  void _onUpgrade(Database db, int oldVersion, int newVersion) async {
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       await db.execute('ALTER TABLE trips ADD COLUMN latitude REAL');
       await db.execute('ALTER TABLE trips ADD COLUMN longitude REAL');
@@ -88,9 +90,12 @@ class DatabaseHelper {
         ''');
       }
     }
+    if (oldVersion < 6) {
+      await db.execute('ALTER TABLE trips ADD COLUMN status TEXT DEFAULT "planned"');
+    }
   }
 
-  void _onCreate(Database db, int version) async {
+  Future<void> _onCreate(Database db, int version) async {
     await db.execute('''
       CREATE TABLE trips(
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -102,7 +107,8 @@ class DatabaseHelper {
         planned_date INTEGER NOT NULL,
         end_date INTEGER NOT NULL,
         notes TEXT,
-        activities TEXT  -- JSON string
+        activities TEXT  -- JSON string,
+        status TEXT DEFAULT 'planned'
       )
     ''');
 
@@ -170,6 +176,7 @@ class DatabaseHelper {
       'end_date': trip.endDate.millisecondsSinceEpoch,
       'notes': trip.notes,
       'activities': jsonEncode(trip.activities),
+      'status': trip.status,
     };
     return await db.insert('trips', data);
   }
@@ -190,6 +197,48 @@ class DatabaseHelper {
         endDate: DateTime.fromMillisecondsSinceEpoch(map['end_date']),
         notes: map['notes'],
         activities: List<String>.from(jsonDecode(map['activities'] ?? '[]')),
+        status: map['status'] ?? 'planned',
+      );
+    });
+  }
+
+  Future<List<Trip>> getCompletedTrips() async {
+    final db = await database;
+    List<Map<String, dynamic>> maps = await db.query('trips', where: 'status = ?', whereArgs: ['completed']);
+    return List.generate(maps.length, (i) {
+      Map<String, dynamic> map = maps[i];
+      return Trip(
+        id: map['id'],
+        name: map['name'],
+        location: map['location'],
+        latitude: map['latitude'],
+        longitude: map['longitude'],
+        imageUrl: map['image_url'] ?? '',
+        plannedDate: DateTime.fromMillisecondsSinceEpoch(map['planned_date']),
+        endDate: DateTime.fromMillisecondsSinceEpoch(map['end_date']),
+        notes: map['notes'],
+        activities: List<String>.from(jsonDecode(map['activities'] ?? '[]')),
+        status: map['status'] ?? 'completed',
+      );
+    });
+  }
+  Future<List<Trip>> getPlannedTrips() async {
+    final db = await database;
+    List<Map<String, dynamic>> maps = await db.query('trips', where: 'status = ?', whereArgs: ['planned']);
+    return List.generate(maps.length, (i) {
+      Map<String, dynamic> map = maps[i];
+      return Trip(
+        id: map['id'],
+        name: map['name'],
+        location: map['location'],
+        latitude: map['latitude'],
+        longitude: map['longitude'],
+        imageUrl: map['image_url'] ?? '',
+        plannedDate: DateTime.fromMillisecondsSinceEpoch(map['planned_date']),
+        endDate: DateTime.fromMillisecondsSinceEpoch(map['end_date']),
+        notes: map['notes'],
+        activities: List<String>.from(jsonDecode(map['activities'] ?? '[]')),
+        status: map['status'] ?? 'planned',
       );
     });
   }
@@ -206,6 +255,7 @@ class DatabaseHelper {
       'end_date': trip.endDate.millisecondsSinceEpoch,
       'notes': trip.notes,
       'activities': jsonEncode(trip.activities),
+      'status': trip.status,
     };
     return await db.update('trips', data, where: 'id = ?', whereArgs: [trip.id]);
   }
@@ -465,6 +515,80 @@ class DatabaseHelper {
       await db.close();
       _database = null;
     }
+  }
+
+  Future<int> insertPreviousTrip(PreviousTrip prevTrip) async {
+    final db = await database;
+    final expensesJson = prevTrip.expenses.map((e) => {
+      'description': e.description,
+      'amount': e.amount,
+      'icon': e.icon.codePoint,
+    }).toList();
+    final photosJson = prevTrip.photos.map((p) => {
+      'imageUrl': p.imageUrl,
+      'date': p.date.millisecondsSinceEpoch,
+      'location': p.location,
+    }).toList();
+    Map<String, dynamic> data = {
+      'trip_id': prevTrip.baseTrip.id,
+      'route': jsonEncode(prevTrip.route),
+      'expenses': jsonEncode(expensesJson),
+      'photos': jsonEncode(photosJson),
+    };
+    return await db.insert('previous_trips', data);
+  }
+
+  Future<List<PreviousTrip>> getPreviousTrips() async {
+    final db = await database;
+    List<Map<String, dynamic>> maps = await db.query('previous_trips');
+    List<PreviousTrip> previousTrips = [];
+    for (var prevMap in maps) {
+      // Get the base trip
+      final tripMaps = await db.query('trips', where: 'id = ?', whereArgs: [prevMap['trip_id']]);
+      if (tripMaps.isEmpty) continue;
+      final tripMap = tripMaps.first;
+      final baseTrip = Trip(
+        id: tripMap['id'] as int?,
+        name: tripMap['name'] as String,
+        location: tripMap['location'] as String,
+        latitude: tripMap['latitude'] as double?,
+        longitude: tripMap['longitude'] as double?,
+        imageUrl: (tripMap['image_url'] as String?) ?? '',
+        plannedDate: DateTime.fromMillisecondsSinceEpoch(tripMap['planned_date'] as int),
+        endDate: DateTime.fromMillisecondsSinceEpoch(tripMap['end_date'] as int),
+        notes: (tripMap['notes'] as String?) ?? '',
+        activities: List<String>.from((jsonDecode((tripMap['activities'] as String?) ?? '[]') as List<dynamic>)),
+        status: (tripMap['status'] as String?) ?? 'completed',
+      );
+
+      // Parse route
+      final route = List<String>.from(jsonDecode(prevMap['route'] ?? '[]'));
+
+      // Parse expenses
+      final expensesJson = jsonDecode(prevMap['expenses'] ?? '[]');
+      final expenses = expensesJson.map<Expense>((json) => Expense(
+        description: json['description'] as String,
+        amount: (json['amount'] as num).toDouble(),
+        icon: IconData(json['icon'] as int),
+      )).toList();
+
+      // Parse photos
+      final photosJson = jsonDecode(prevMap['photos'] ?? '[]');
+      final photos = photosJson.map<TripPhoto>((json) => TripPhoto(
+        imageUrl: json['imageUrl'] as String,
+        date: DateTime.fromMillisecondsSinceEpoch(json['date'] as int),
+        location: json['location'] as String,
+      )).toList();
+
+      final prevTrip = PreviousTrip(
+        baseTrip: baseTrip,
+        route: route,
+        expenses: expenses,
+        photos: photos,
+      );
+      previousTrips.add(prevTrip);
+    }
+    return previousTrips;
   }
 
   // CRUD for Location Points

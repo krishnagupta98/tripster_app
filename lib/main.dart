@@ -1,6 +1,7 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_application_1/splash_screen.dart';
 import 'firebase_options.dart';
 import 'services/database_helper.dart';
@@ -25,8 +26,10 @@ class MyApp extends StatelessWidget {
       title: 'Tripster',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        primarySwatch: Colors.blue,
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
         visualDensity: VisualDensity.adaptivePlatformDensity,
+        textTheme: GoogleFonts.poppinsTextTheme(),
       ),
       home: SplashScreen(),
     );

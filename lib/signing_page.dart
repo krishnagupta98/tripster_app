@@ -211,6 +211,7 @@ class _SigningPageState extends State<SigningPage> {
         backgroundColor: kPrimaryBlue,
         foregroundColor: Colors.white,
       ).animate().fadeIn(delay: 800.ms),
+      floatingActionButtonLocation: FloatingActionButtonLocation.startFloat,
     );
   }
 
