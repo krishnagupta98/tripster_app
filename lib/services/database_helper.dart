@@ -243,6 +243,27 @@ class DatabaseHelper {
     });
   }
 
+  Future<List<Trip>> getOngoingTrips() async {
+    final db = await database;
+    List<Map<String, dynamic>> maps = await db.query('trips', where: 'status = ?', whereArgs: ['active']);
+    return List.generate(maps.length, (i) {
+      Map<String, dynamic> map = maps[i];
+      return Trip(
+        id: map['id'],
+        name: map['name'],
+        location: map['location'],
+        latitude: map['latitude'],
+        longitude: map['longitude'],
+        imageUrl: map['image_url'] ?? '',
+        plannedDate: DateTime.fromMillisecondsSinceEpoch(map['planned_date']),
+        endDate: DateTime.fromMillisecondsSinceEpoch(map['end_date']),
+        notes: map['notes'],
+        activities: List<String>.from(jsonDecode(map['activities'] ?? '[]')),
+        status: map['status'] ?? 'active',
+      );
+    });
+  }
+
   Future<int> updateTrip(Trip trip) async {
     final db = await database;
     Map<String, dynamic> data = {

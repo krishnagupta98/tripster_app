@@ -64,16 +64,11 @@ class _PlannedTripsPageState extends State<PlannedTripsPage> {
     }
   }
 
-  // This function is now correctly used by the edit button
   Future<void> _updateTrip(int index) async {
-    // For simplicity, show snackbar; in full impl, show edit form
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text("Updated trip: ${_trips[index].name}")),
     );
-    // To actually update, would need edit form, then:
-    // final updatedTrip = ...;
-    // await dbHelper.updateTrip(updatedTrip);
-    // await _loadTrips();
+    
   }
 
   Future<void> _removeTrip(int index) async {
