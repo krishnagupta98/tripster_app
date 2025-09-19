@@ -3,7 +3,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
-import 'package:flutter_application_1/models/trip_model.dart';
 import 'package:flutter_application_1/services/database_helper.dart';
 import 'package:flutter_application_1/previous_trips_details_page.dart';
 import 'package:flutter_application_1/models/previous_trip_model.dart';
@@ -18,7 +17,7 @@ class PreviousTripsPage extends StatefulWidget {
 }
 
 class _PreviousTripsPageState extends State<PreviousTripsPage> {
-  List<Trip> _trips = [];
+  List<PreviousTrip> _previousTrips = [];
   bool _isLoading = true;
 
   @override
@@ -30,9 +29,9 @@ class _PreviousTripsPageState extends State<PreviousTripsPage> {
   Future<void> _loadTrips() async {
     try {
       final dbHelper = DatabaseHelper();
-      final trips = await dbHelper.getCompletedTrips();
+      final previousTrips = await dbHelper.getPreviousTrips();
       setState(() {
-        _trips = trips;
+        _previousTrips = previousTrips;
         _isLoading = false;
       });
     } catch (e) {
@@ -61,7 +60,7 @@ class _PreviousTripsPageState extends State<PreviousTripsPage> {
         backgroundColor: Colors.white,
         elevation: 1,
       ),
-      body: _trips.isEmpty
+      body: _previousTrips.isEmpty
           ? const Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -73,17 +72,12 @@ class _PreviousTripsPageState extends State<PreviousTripsPage> {
               ),
             )
           : ListView.builder(
-              itemCount: _trips.length,
+              itemCount: _previousTrips.length,
               itemBuilder: (context, index) {
-                final trip = _trips[index];
+                final prevTrip = _previousTrips[index];
+                final trip = prevTrip.baseTrip;
                 return ListTile(
                   onTap: () {
-                    final prevTrip = PreviousTrip(
-                      baseTrip: trip,
-                      route: [],
-                      expenses: [],
-                      photos: [],
-                    );
                     Navigator.push(
                       context,
                       MaterialPageRoute(
